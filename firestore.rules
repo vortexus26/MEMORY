@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.email == 'admin@memory.com';
+    }
+
+    match /media/{mediaId} {
+      // ADMIN: baca semua data. PUBLIK: hanya data yang sudah approved.
+      allow get: if isAdmin() || resource.data.status == 'approved';
+      allow list: if isAdmin() || resource.data.status == 'approved';
+
+      // User login hanya boleh membuat upload miliknya sendiri dengan status pending.
+      allow create: if signedIn()
+                    && request.resource.data.uploaderUid == request.auth.uid
+                    && request.resource.data.status == 'pending';
+
+      // Hanya ADMIN yang boleh approve, reject, atau delete.
+      allow update, delete: if isAdmin();
+    }
+  }
+}
